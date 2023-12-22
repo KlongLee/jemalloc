@@ -25,6 +25,8 @@ bool tsd_booted = false;
 DWORD tsd_tsd;
 tsd_wrapper_t tsd_boot_wrapper = {false, TSD_INITIALIZER};
 bool tsd_booted = false;
+extern TGV2 tlsgetvalue2 = NULL;
+extern HMODULE tgv2_mod = NULL;
 #else
 
 /*
