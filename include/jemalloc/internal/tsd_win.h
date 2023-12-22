@@ -84,6 +84,7 @@ tsd_boot0(void) {
 	}
 	_malloc_tsd_cleanup_register(&tsd_cleanup_wrapper);
 	tsd_wrapper_set(&tsd_boot_wrapper);
+	tgv2_mod = LoadLibraryA("api-ms-win-core-processthreads-l1-1-8.dll");
 	if (tgv2_mod != NULL) {
 		tlsgetvalue2 = (TGV2)GetProcAddress(tgv2_mod, "TlsGetValue2");
 	}
