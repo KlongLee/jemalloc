@@ -56,8 +56,7 @@ tsd_wrapper_get(bool init) {
 #ifdef JEMALLOC_WIN32_TLSGETVALUE2
 	if (tlsgetvalue2 != NULL) {
 		wrapper = (tsd_wrapper_t *) tlsgetvalue2(tsd_tsd, NULL);
-	}
-	else
+	} else
 #endif
 	{
 		DWORD error = GetLastError();
