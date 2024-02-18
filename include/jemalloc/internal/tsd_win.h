@@ -16,6 +16,7 @@ extern DWORD tsd_tsd;
 extern tsd_wrapper_t tsd_boot_wrapper;
 extern bool tsd_booted;
 #ifdef JEMALLOC_WIN32_TLSGETVALUE2
+typedef LPVOID (*TGV2)(DWORD dwTlsIndex);
 extern TGV2 tlsgetvalue2;
 extern HMODULE tgv2_mod;
 #endif
@@ -55,7 +56,7 @@ JEMALLOC_ALWAYS_INLINE tsd_wrapper_t *
 tsd_wrapper_get(bool init) {
 #ifdef JEMALLOC_WIN32_TLSGETVALUE2
 	if (tlsgetvalue2 != NULL) {
-		wrapper = (tsd_wrapper_t *) tlsgetvalue2(tsd_tsd, NULL);
+		wrapper = (tsd_wrapper_t *) tlsgetvalue2(tsd_tsd);
 	} else
 #endif
 	{
