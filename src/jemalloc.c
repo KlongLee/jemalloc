@@ -2354,7 +2354,8 @@ aligned_usize_get(size_t size, size_t alignment, size_t *usize, szind_t *ind,
 			if (unlikely(*ind >= SC_NSIZES)) {
 				return true;
 			}
-			*usize = sz_index2size(*ind);
+			*usize = config_limit_usize_gap? sz_s2u(size):
+			    sz_index2size(*ind);
 			assert(*usize > 0 && *usize <= SC_LARGE_MAXCLASS);
 			return false;
 		}
@@ -2902,7 +2903,7 @@ ifree(tsd_t *tsd, void *ptr, tcache_t *tcache, bool slow_path) {
 	    &alloc_ctx);
 	assert(alloc_ctx.szind != SC_NSIZES);
 
-	size_t usize = sz_index2size(alloc_ctx.szind);
+	size_t usize = emap_alloc_ctx_usize_get(&alloc_ctx);
 	if (config_prof && opt_prof) {
 		prof_free(tsd, ptr, usize, &alloc_ctx);
 	}
@@ -2934,35 +2935,38 @@ isfree(tsd_t *tsd, void *ptr, size_t usize, tcache_t *tcache, bool slow_path) {
 	assert(malloc_initialized() || IS_INITIALIZER);
 
 	emap_alloc_ctx_t alloc_ctx;
+	szind_t szind = sz_size2index(usize);
 	if (!config_prof) {
-		alloc_ctx.szind = sz_size2index(usize);
-		alloc_ctx.slab = (alloc_ctx.szind < SC_NBINS);
+		emap_alloc_ctx_set(&alloc_ctx, szind, (szind < SC_NBINS),
+		    usize);
 	} else {
 		if (likely(!prof_sample_aligned(ptr))) {
 			/*
 			 * When the ptr is not page aligned, it was not sampled.
 			 * usize can be trusted to determine szind and slab.
 			 */
-			alloc_ctx.szind = sz_size2index(usize);
-			alloc_ctx.slab = (alloc_ctx.szind < SC_NBINS);
+			emap_alloc_ctx_set(&alloc_ctx, szind,
+			    (szind < SC_NBINS), usize);
 		} else if (opt_prof) {
 			emap_alloc_ctx_lookup(tsd_tsdn(tsd), &arena_emap_global,
 			    ptr, &alloc_ctx);
 
 			if (config_opt_safety_checks) {
 				/* Small alloc may have !slab (sampled). */
+				size_t true_size =
+				    emap_alloc_ctx_usize_get(&alloc_ctx);
 				if (unlikely(alloc_ctx.szind !=
 				    sz_size2index(usize))) {
 					safety_check_fail_sized_dealloc(
 					    /* current_dealloc */ true, ptr,
-					    /* true_size */ sz_index2size(
-					    alloc_ctx.szind),
+					    /* true_size */ true_size,
 					    /* input_size */ usize);
 				}
 			}
 		} else {
-			alloc_ctx.szind = sz_size2index(usize);
-			alloc_ctx.slab = (alloc_ctx.szind < SC_NBINS);
+			szind_t szind = sz_size2index(usize);
+			emap_alloc_ctx_set(&alloc_ctx, szind,
+			    (szind < SC_NBINS), usize);
 		}
 	}
 	bool fail = maybe_check_alloc_ctx(tsd, ptr, &alloc_ctx);
@@ -3464,7 +3468,7 @@ do_rallocx(void *ptr, size_t size, int flags, bool is_realloc) {
 	emap_alloc_ctx_lookup(tsd_tsdn(tsd), &arena_emap_global, ptr,
 	    &alloc_ctx);
 	assert(alloc_ctx.szind != SC_NSIZES);
-	old_usize = sz_index2size(alloc_ctx.szind);
+	old_usize = emap_alloc_ctx_usize_get(&alloc_ctx);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
 	if (aligned_usize_get(size, alignment, &usize, NULL, false)) {
 		goto label_oom;
@@ -3726,7 +3730,7 @@ je_xallocx(void *ptr, size_t size, size_t extra, int flags) {
 	emap_alloc_ctx_lookup(tsd_tsdn(tsd), &arena_emap_global, ptr,
 	    &alloc_ctx);
 	assert(alloc_ctx.szind != SC_NSIZES);
-	old_usize = sz_index2size(alloc_ctx.szind);
+	old_usize = emap_alloc_ctx_usize_get(&alloc_ctx);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
 	/*
 	 * The API explicitly absolves itself of protecting against (size +
