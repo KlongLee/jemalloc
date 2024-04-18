@@ -247,9 +247,30 @@ sz_index2size_lookup(szind_t index) {
 }
 
 JEMALLOC_ALWAYS_INLINE size_t
-sz_index2size(szind_t index) {
+sz_index2size_unsafe(szind_t index) {
 	assert(index < SC_NSIZES);
 	return sz_index2size_lookup(index);
+}
+
+JEMALLOC_ALWAYS_INLINE size_t
+sz_index2size(szind_t index) {
+	size_t size = sz_index2size_unsafe(index);
+	if (config_limit_usize_gap) {
+		/*
+		 * With limit_usize_gap enabled, the usize above
+		 * SC_LARGE_MINCLASS should grow by PAGE.  However, for sizes
+		 * in [SC_LARGE_MINCLASS, USIZE_GROW_SLOW_THRESHOLD], the
+		 * usize would not change because the size class gap in this
+		 * range is just the same as PAGE.  Although we use
+		 * SC_LARGE_MINCLASS as the threshold in most places, we
+		 * allow tcache to cache up to USIZE_GROW_SLOW_THRESHOLD to
+		 * minimize the side effect of not having size classes for
+		 * large sizes.  Thus, we assert the size is no larger than
+		 * USIZE_GROW_SLOW_THRESHOLD here instead of SC_LARGE_MINCLASS.
+		 */
+		assert(size <= USIZE_GROW_SLOW_THRESHOLD);
+	}
+	return size;
 }
 
 JEMALLOC_ALWAYS_INLINE void
@@ -282,12 +303,29 @@ sz_s2u_compute(size_t size) {
 		size_t delta = ZU(1) << lg_delta;
 		size_t delta_mask = delta - 1;
 		size_t usize = (size + delta_mask) & ~delta_mask;
+		if (config_limit_usize_gap) {
+			if (usize - size >= PAGE) {
+				/*
+				 * When usize is adding too much overhead,
+				 * i.e., larger than PAGE, decrease it to
+				 * the smallest multiple of PAGE large than
+				 * size.
+				*/
+				size_t lg_page = lg_floor(PAGE);
+				size_t page_gap = ((usize - size) >> lg_page)
+				    << lg_page;
+				usize = usize - page_gap;
+			}
+		}
 		return usize;
 	}
 }
 
 JEMALLOC_ALWAYS_INLINE size_t
 sz_s2u_lookup(size_t size) {
+	if (config_limit_usize_gap) {
+		assert(size < SC_LARGE_MINCLASS);
+	}
 	size_t ret = sz_index2size_lookup(sz_size2index_lookup(size));
 
 	assert(ret == sz_s2u_compute(size));

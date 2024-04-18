@@ -246,7 +246,7 @@ emap_alloc_ctx_set(emap_alloc_ctx_t *alloc_ctx, szind_t szind, bool slab,
 JEMALLOC_ALWAYS_INLINE size_t
 emap_alloc_ctx_usize_get(emap_alloc_ctx_t *alloc_ctx) {
 	return
-#ifdef LIMIT_SUZIE_GAP
+#ifdef LIMIT_USIZE_GAP
 	    alloc_ctx->usize;
 #else
 	    sz_index2size(alloc_ctx->szind);
