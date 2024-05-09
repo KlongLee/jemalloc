@@ -247,6 +247,18 @@ nstime_get_realtime(nstime_t *time) {
 }
 
 static void
+nstime_get_ignore_coarse(nstime_t *time) {
+#if !defined(_WIN32) && defined(JEMALLOC_HAVE_CLOCK_MONOTONIC)
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	nstime_init2(time, ts.tv_sec, ts.tv_nsec);
+#else
+	nstime_get(time);
+#endif
+}
+
+static void
 nstime_prof_update_impl(nstime_t *time) {
 	nstime_t old_time;
 
@@ -274,6 +286,19 @@ nstime_update_impl(nstime_t *time) {
 }
 nstime_update_t *JET_MUTABLE nstime_update = nstime_update_impl;
 
+static void
+nstime_tcache_gc_update(nstime_t *time) {
+	nstime_t old_time;
+
+	nstime_copy(&old_time, time);
+	nstime_get_ignore_coarse(time);
+
+	/* Handle non-monotonic clocks. */
+	if (unlikely(nstime_compare(&old_time, time) > 0)) {
+		nstime_copy(time, &old_time);
+	}
+}
+
 void
 nstime_init_update(nstime_t *time) {
 	nstime_init_zero(time);
@@ -286,4 +311,8 @@ nstime_prof_init_update(nstime_t *time) {
 	nstime_prof_update(time);
 }
 
-
+void
+nstime_tcache_gc_init_update(nstime_t *time) {
+	nstime_init_zero(time);
+	nstime_tcache_gc_update(time);
+}

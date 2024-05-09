@@ -51,6 +51,7 @@ extern nstime_prof_update_t *JET_MUTABLE nstime_prof_update;
 
 void nstime_init_update(nstime_t *time);
 void nstime_prof_init_update(nstime_t *time);
+void nstime_tcache_gc_init_update(nstime_t *time);
 
 enum prof_time_res_e {
 	prof_time_res_default = 0,

@@ -4,6 +4,7 @@
 #include "jemalloc/internal/assert.h"
 #include "jemalloc/internal/base.h"
 #include "jemalloc/internal/mutex.h"
+#include "jemalloc/internal/nstime.h"
 #include "jemalloc/internal/safety_check.h"
 #include "jemalloc/internal/san.h"
 #include "jemalloc/internal/sc.h"
@@ -50,6 +51,14 @@ size_t opt_tcache_gc_incr_bytes = 65536;
  * effective maximum value for a size class is 255 * sz.
  */
 size_t opt_tcache_gc_delay_bytes = 0;
+
+/*
+ * In addition to the number of allocation bytes regulated GC, we'd like to
+ * further avoid frequent GC that's triggered by large-sized allocation.
+ * This is achieved by requiring a time interval between two GCs.
+ * By default, we set time regulated GC off.
+ */
+ssize_t opt_tcache_gc_interval_us = -1;
 
 /*
  * When a cache bin is flushed because it's full, how much of it do we flush?
@@ -192,6 +201,17 @@ tcache_event(tsd_t *tsd) {
 	}
 
 	tcache_slow_t *tcache_slow = tsd_tcache_slowp_get(tsd);
+	if (opt_tcache_gc_interval_us > 0 && nstime_monotonic()) {
+		nstime_t now;
+		nstime_tcache_gc_init_update(&now);
+
+		if (nstime_compare(&tcache_slow->next_gc_time, &now) > 0) {
+			return;
+		}
+		nstime_copy(&tcache_slow->next_gc_time, &now);
+		nstime_add(&tcache_slow->next_gc_time, &tcache_slow->gc_interval);
+	}
+
 	szind_t szind = tcache_slow->next_gc_bin;
 	bool is_small = (szind < SC_NBINS);
 	cache_bin_t *cache_bin = &tcache->bins[szind];
@@ -709,6 +729,11 @@ tcache_init(tsd_t *tsd, tcache_slow_t *tcache_slow, tcache_t *tcache,
 	tcache_slow->tcache = tcache;
 
 	memset(&tcache_slow->link, 0, sizeof(ql_elm(tcache_t)));
+	if (opt_tcache_gc_interval_us > 0 && nstime_monotonic()) {
+		nstime_init_zero(&tcache_slow->next_gc_time);
+		nstime_init(&tcache_slow->gc_interval,
+		    (uint64_t)opt_tcache_gc_interval_us * KQU(1000));
+	}
 	tcache_slow->next_gc_bin = 0;
 	tcache_slow->arena = NULL;
 	tcache_slow->dyn_alloc = mem;
