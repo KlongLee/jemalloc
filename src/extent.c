@@ -1196,6 +1196,7 @@ extent_split_impl(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks,
 
 	edata_t *trail = edata_cache_get(tsdn, pac->edata_cache);
 	if (trail == NULL) {
+		printf("No available edata when splitting\n");
 		goto label_error_a;
 	}
 
@@ -1208,6 +1209,7 @@ extent_split_impl(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks,
 	bool err = emap_split_prepare(tsdn, pac->emap, &prepare, edata,
 	    size_a, trail, size_b);
 	if (err) {
+		printf("split_prepare failed\n");
 		goto label_error_b;
 	}
 
@@ -1224,6 +1226,7 @@ extent_split_impl(tsdn_t *tsdn, pac_t *pac, ehooks_t *ehooks,
 	    size_a, size_b, edata_committed_get(edata));
 
 	if (err) {
+		//printf("Split failed\n");
 		goto label_error_b;
 	}
 

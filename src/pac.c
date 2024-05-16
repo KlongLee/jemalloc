@@ -238,12 +238,14 @@ pac_shrink_impl(tsdn_t *tsdn, pai_t *self, edata_t *edata, size_t old_size,
 	size_t shrink_amount = old_size - new_size;
 
 	if (ehooks_split_will_fail(ehooks)) {
+		printf("pac_shrink hook split fail with %p\n", ehooks);
 		return true;
 	}
 
 	edata_t *trail = extent_split_wrapper(tsdn, pac, ehooks, edata,
 	    new_size, shrink_amount, /* holding_core_locks */ false);
 	if (trail == NULL) {
+		printf("pac_shrink fail to get trail with %p\n", ehooks);
 		return true;
 	}
 	ecache_dalloc(tsdn, pac, ehooks, &pac->ecache_dirty, trail);

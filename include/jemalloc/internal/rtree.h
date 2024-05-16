@@ -190,6 +190,11 @@ rtree_read_metadata_usize(rtree_contents_t *contents) {
 	}
 	if (config_limit_usize_gap && usize_from_ind >= SC_LARGE_MINCLASS
 	    && edata_avail) {
+		size_t test_usize = edata_usize_get_from_size_unsafe(contents->edata);
+		if (test_usize < SC_LARGE_MINCLASS) {
+			printf("Error reading rtree with ind usize %lu and size_usize %lu\n",
+			    usize_from_ind, test_usize);
+		}
 		contents->metadata.usize =
 		    edata_usize_get_from_size(contents->edata);
 		return;
