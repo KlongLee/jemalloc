@@ -124,6 +124,7 @@ emap_rtree_leaf_elms_lookup(tsdn_t *tsdn, emap_t *emap, rtree_ctx_t *rtree_ctx,
 	*r_elm_a = rtree_leaf_elm_lookup(tsdn, &emap->rtree, rtree_ctx,
 	    (uintptr_t)edata_base_get(edata), dependent, init_missing);
 	if (!dependent && *r_elm_a == NULL) {
+		printf("Failed when reading element a\n");
 		return true;
 	}
 	assert(*r_elm_a != NULL);
@@ -131,6 +132,7 @@ emap_rtree_leaf_elms_lookup(tsdn_t *tsdn, emap_t *emap, rtree_ctx_t *rtree_ctx,
 	*r_elm_b = rtree_leaf_elm_lookup(tsdn, &emap->rtree, rtree_ctx,
 	    (uintptr_t)edata_last_get(edata), dependent, init_missing);
 	if (!dependent && *r_elm_b == NULL) {
+		printf("Failed when reading element b\n");
 		return true;
 	}
 	assert(*r_elm_b != NULL);

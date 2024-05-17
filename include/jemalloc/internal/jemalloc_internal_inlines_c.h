@@ -425,8 +425,9 @@ maybe_check_alloc_ctx(tsd_t *tsd, void *ptr, emap_alloc_ctx_t *alloc_ctx) {
                 if (alloc_ctx->szind != dbg_ctx.szind) {
                         safety_check_fail_sized_dealloc(
                             /* current_dealloc */ true, ptr,
-                            /* true_size */ sz_size2index(dbg_ctx.szind),
-                            /* input_size */ sz_size2index(alloc_ctx->szind));
+                            /* true_size */ emap_alloc_ctx_usize_get(&dbg_ctx),
+                            /* input_size */ emap_alloc_ctx_usize_get(
+                            alloc_ctx));
                         return true;
                 }
                 if (alloc_ctx->slab != dbg_ctx.slab) {
@@ -518,6 +519,9 @@ bool free_fastpath(void *ptr, size_t size, bool size_hint) {
                     /* check_prof */ true))) {
                         return false;
                 }
+                szind_t szind = sz_size2index_lookup(size);
+                emap_alloc_ctx_set(&alloc_ctx, szind, true,
+                    sz_index2size(szind));
                 alloc_ctx.szind = sz_size2index_lookup(size);
                 /* Max lookup class must be small. */
                 assert(alloc_ctx.szind < SC_NBINS);
@@ -534,7 +538,9 @@ bool free_fastpath(void *ptr, size_t size, bool size_hint) {
         uint64_t deallocated, threshold;
         te_free_fastpath_ctx(tsd, &deallocated, &threshold);
 
-        size_t usize = sz_index2size(alloc_ctx.szind);
+        size_t usize = config_limit_usize_gap?
+	    emap_alloc_ctx_usize_get(&alloc_ctx):
+	    sz_index2size(alloc_ctx.szind);
         uint64_t deallocated_after = deallocated + usize;
         /*
          * Check for events and tsd non-nominal (fast_threshold will be set to

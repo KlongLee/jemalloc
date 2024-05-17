@@ -49,6 +49,9 @@ struct rtree_metadata_s {
 	extent_state_t state; /* Mirrors edata->state. */
 	bool is_head; /* Mirrors edata->is_head. */
 	bool slab;
+#ifdef LIMIT_USIZE_GAP
+	size_t usize;
+#endif
 };
 
 typedef struct rtree_contents_s rtree_contents_t;
@@ -167,6 +170,40 @@ rtree_subkey(uintptr_t key, unsigned level) {
 	return ((key >> shiftbits) & mask);
 }
 
+#ifdef LIMIT_USIZE_GAP
+JEMALLOC_ALWAYS_INLINE void
+rtree_read_metadata_usize(rtree_contents_t *contents) {
+	bool szind_avail = contents->metadata.szind < SC_NSIZES;
+	bool edata_avail = contents->edata != NULL;
+	/*
+	 * If szind is not available, the usize is also not available.
+	 * Otherwise, use the usize retrieved from edata for large allocs
+	 * when limit_usize_gap is enabled.  Although it is possible that
+	 * szind is available but edata is not available, i.e., in
+	 * emap_register_boundary, the call sites are not using usize anyway.
+	 */
+	size_t usize_from_ind = szind_avail?
+	    sz_index2size_unsafe(contents->metadata.szind): 0;
+	// This does not break any tests, but is it necessary?
+	if (szind_avail && !edata_avail) {
+		assert(usize_from_ind < SC_LARGE_MINCLASS);
+	}
+	if (config_limit_usize_gap && usize_from_ind >= SC_LARGE_MINCLASS
+	    && edata_avail) {
+		size_t test_usize = edata_usize_get_from_size_unsafe(contents->edata);
+		if (test_usize < SC_LARGE_MINCLASS) {
+			printf("Error reading rtree with ind usize %lu and size_usize %lu\n",
+			    usize_from_ind, test_usize);
+		}
+		contents->metadata.usize =
+		    edata_usize_get_from_size(contents->edata);
+		return;
+	}
+	contents->metadata.usize = usize_from_ind;
+	return;
+}
+#endif
+
 /*
  * Atomic getters.
  *
@@ -235,6 +272,9 @@ rtree_leaf_elm_bits_decode(uintptr_t bits) {
 	    >> RTREE_NHIB) & low_bit_mask);
 #    endif
 	assert((uintptr_t)contents.edata % (uintptr_t)EDATA_ALIGNMENT == 0);
+#    ifdef LIMIT_USIZE_GAP
+	rtree_read_metadata_usize(&contents);
+#    endif
 	return contents;
 }
 
@@ -263,6 +303,9 @@ rtree_leaf_elm_read(tsdn_t *tsdn, rtree_t *rtree, rtree_leaf_elm_t *elm,
 
 	contents.edata = (edata_t *)atomic_load_p(&elm->le_edata, dependent
 	    ? ATOMIC_RELAXED : ATOMIC_ACQUIRE);
+#    ifdef LIMIT_USIZE_GAP
+	rtree_read_metadata_usize(&contents);
+#    endif
 
 	return contents;
 #endif
@@ -271,6 +314,13 @@ rtree_leaf_elm_read(tsdn_t *tsdn, rtree_t *rtree, rtree_leaf_elm_t *elm,
 JEMALLOC_ALWAYS_INLINE void
 rtree_contents_encode(rtree_contents_t contents, void **bits,
     unsigned *additional) {
+	// This is used to ensure that during writing, no cases where
+	// szind_avail is true but edata_avail is false. Can be deleted.
+	bool szind_avail = contents.metadata.szind < SC_NSIZES;
+	bool edata_avail = contents.edata != NULL;
+	if (!edata_avail) {
+		assert(!szind_avail);
+	}
 #ifdef RTREE_LEAF_COMPACT
 	/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
 	*bits = (void *)rtree_leaf_elm_bits_encode(contents);

@@ -28,6 +28,7 @@ large_palloc(tsdn_t *tsdn, arena_t *arena, size_t usize, size_t alignment,
 
 	ausize = sz_sa2u(usize, alignment);
 	if (unlikely(ausize == 0 || ausize > SC_LARGE_MAXCLASS)) {
+		printf("In large_palloc, usize: %lu, ausize: %lu\n", usize, ausize);
 		return NULL;
 	}
 
@@ -36,6 +37,9 @@ large_palloc(tsdn_t *tsdn, arena_t *arena, size_t usize, size_t alignment,
 	}
 	if (unlikely(arena == NULL) || (edata = arena_extent_alloc_large(tsdn,
 	    arena, usize, alignment, zero)) == NULL) {
+		edata = arena_extent_alloc_large(tsdn,
+		    arena, usize, alignment, zero);
+		printf("In palloc, arena: %p, edata: %p\n", arena, edata);
 		return NULL;
 	}
 
@@ -60,7 +64,9 @@ large_ralloc_no_move_shrink(tsdn_t *tsdn, edata_t *edata, size_t usize) {
 
 	assert(old_usize > usize);
 
+
 	if (ehooks_split_will_fail(ehooks)) {
+		printf("In large_ralloc_no_move_shrink split fail with old_usize: %lu, usize: %lu\n", old_usize, usize);
 		return true;
 	}
 
@@ -69,6 +75,7 @@ large_ralloc_no_move_shrink(tsdn_t *tsdn, edata_t *edata, size_t usize) {
 	    usize + sz_large_pad, sz_size2index(usize),
 	    &deferred_work_generated);
 	if (err) {
+		printf("In large_ralloc_no_move_shrink pa_shrink fail with old_usize: %lu, usize: %lu\n", old_usize, usize);
 		return true;
 	}
 	if (deferred_work_generated) {
@@ -168,6 +175,8 @@ large_ralloc_no_move(tsdn_t *tsdn, edata_t *edata, size_t usize_min,
 			return false;
 		}
 	}
+	printf("In large_ralloc_no_move with oldusize: %lu and usize: %lu\n",
+	    oldusize, usize_min);
 	return true;
 }
 
