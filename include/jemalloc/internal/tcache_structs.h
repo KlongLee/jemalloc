@@ -33,6 +33,9 @@ struct tcache_slow_s {
 	arena_t		*arena;
 	/* The number of bins activated in the tcache. */
 	unsigned	tcache_nbins;
+	/* Next time to GC. */
+	nstime_t        next_gc_time;
+	nstime_t        gc_interval;
 	/* Next bin to GC. */
 	szind_t		next_gc_bin;
 	/* For small bins, fill (ncached_max >> lg_fill_div). */

@@ -1457,6 +1457,9 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 			    "tcache_gc_delay_bytes", 0, SIZE_T_MAX,
 			    CONF_DONT_CHECK_MIN, CONF_DONT_CHECK_MAX,
 			    /* clip */ false)
+			CONF_HANDLE_SSIZE_T(opt_tcache_gc_interval_us,
+			    "tcache_gc_interval_us", -1, NSTIME_SEC_MAX * KQU(1000000) <
+			    QU(SSIZE_MAX) ? NSTIME_SEC_MAX * KQU(1000000) : SSIZE_MAX);
 			CONF_HANDLE_UNSIGNED(opt_lg_tcache_flush_small_div,
 			    "lg_tcache_flush_small_div", 1, 16,
 			    CONF_CHECK_MIN, CONF_CHECK_MAX, /* clip */ true)
